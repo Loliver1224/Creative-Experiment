@@ -3,7 +3,10 @@ import numpy as np
 import pyper
 from graphviz import Source
 import webbrowser
-from os import getcwd, rename, remove as rm_file
+import tempfile
+from os import getcwd
+from shutil import copy2 as copyfile
+import sys
 
 from SAM import SAM
 from testdata import make_test_data
@@ -88,21 +91,25 @@ print(r('summary(ans,fit.indices = c("GFI","AGFI","SRMR","RMSEA"))'))
 
 """ --- rendering ---
 """
-r('pathDiagram(ans, "output_diagram", output.type = "graphics",\
-    ignore.double = FALSE, edge.labels = "values", digits = 3)')
+with tempfile.TemporaryDirectory() as tempdir:
+    # 作業ディレクトリを一時ディレクトリに設定
+    tempdir = tempdir.replace('\\', '/')
+    r('setwd(\"' + tempdir + '\")')
+    r('pathDiagram(ans, "output_diagram", output.type = "graphics",\
+        ignore.double = FALSE, edge.labels = "values", digits = 3)')
 
-output_format = input("output format? (png or svg or pdf) >> ")
-output_filename = input("output file name? >> ") + '.' + output_format
-Source.from_file(filename="./output_diagram.dot", format=output_format, engine='dot').render()
-rename("output_diagram.dot." + output_format, output_filename)
-
-""" --- remove temporary file ---
-"""
-try:
-    rm_file("./output_diagram.dot")
-    rm_file("./output_diagram.pdf")
-except FileNotFoundError as e:
-    pass
+    output_format = input("output format? (png / svg / pdf) >> ")
+    output_filename = input("output file name? >> ") + '.' + output_format
+    try:
+        Source.from_file(filename=tempdir + "/output_diagram.dot", format=output_format, engine='dot').render()
+        copyfile(tempdir + "/output_diagram.dot." + output_format, output_filename)
+    except Exception as e:
+        print("RenderingError: パス図の出力において例外が発生しました")
+        print(e)
+        sys.exit(1)
+    finally:
+        r('setwd(\"' + getcwd() + '\"')
+        print("Rendering Successed.")
 
 """ --- show rendered Diagram in web browser ---
 """
